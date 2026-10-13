@@ -1,0 +1,16 @@
+{
+    "name": "dmc3105/mini-laravel",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "MiniLaravel\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Alexey Govorov",
+            "email": "algovor04@gmail.com"
+        }
+    ],
+    "require": {}
+}
