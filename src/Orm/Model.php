@@ -26,7 +26,7 @@ class Model{
         $object = new static();
 
         $tablename = static::getTableName();
-        $sql = "SELECT * FROM {$tablename} WHERE id = :id";
+        $sql = "SELECT * FROM $tablename WHERE id = :id";
         
         $statement = self::$database
             ->getPdo()
@@ -48,10 +48,6 @@ class Model{
         return $object;
     }
 
-    private function fill(array $data) : void {
-        $this->fields = $data;
-    }
-
     public function __get(string $name) : mixed
     {
         return $this->fields[$name];
@@ -66,4 +62,34 @@ class Model{
     {
         return json_encode($this->fields);
     }
+
+    private function fill(array $data) : void {
+        $this->fields = $data;
+    }
+
+    public function insert() : void {
+        $tablename = static::getTableName();
+        
+        $columns = array_keys($this->fields);
+        $columns = implode(", ", $columns);
+
+        $valuesData = [];
+        foreach ($this->fields as $key => $value) {
+            $valuesData[":".$key] = $value;
+        }
+
+        $valuesTemplate = implode(", ", array_keys($valuesData));
+
+        $sql = "INSERT INTO $tablename ($columns) VALUES ($valuesTemplate)";
+
+        $statement = self::$database
+            ->getPdo()
+            ->prepare($sql);
+
+        $statement->execute($valuesData);
+        $this->fields['id'] = self::$database->getPdo()->lastInsertId();
+    }
+
+    //insert into Users (id, name, age) values (:id, :name, :age);
+    //[:id => 1, :name => bob, :age => age]
 }
