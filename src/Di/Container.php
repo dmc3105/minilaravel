@@ -35,28 +35,36 @@ class Container {
 
     private function getInternal(string $id, array &$alreadyResolvedIds) : object
     {
-        if ($this->hasBinding($id)) {
-            $id = $this->getBinding($id);
+        if ($this->isAbstract($id)) {
+            $id = $this->getConcrete($id);
         }
-        if (in_array($id, $alreadyResolvedIds)) {
-            throw new RuntimeException("Cycle dependency was detect");
-        }
-        $alreadyResolvedIds[] = $id;
+
+        $this->validateAlreadyResolved($id, $alreadyResolvedIds);
 
         if (isset($this->instances[$id])) {
             return $this->instances[$id];
         }
 
         $reflection = new ReflectionClass($id);
-
         if (!$reflection->isInstantiable()) {
             throw new RuntimeException("Need to bind the abstract {$reflection->getName()} to a concrete class");
         }
 
-        $constructor = $reflection->getConstructor();
+        return $this->createInstance($reflection, $alreadyResolvedIds);
+    }
 
+    private function validateAlreadyResolved(string $id, array &$alreadyResolvedIds) : void {
+        if (in_array($id, $alreadyResolvedIds)) {
+            throw new RuntimeException("Cycle dependency was detect");
+        }
+        $alreadyResolvedIds[] = $id;
+    }
+
+    private function createInstance(ReflectionClass $reflection, array $alreadyResolvedIds)
+    {
+        $constructor = $reflection->getConstructor();
         if (!isset($constructor)) {
-            return $this->createInstance($reflection);
+            return $this->newInstance($reflection);
         }
 
         $dependencies = [];
@@ -71,30 +79,36 @@ class Container {
             $dependencies[] = $this->getInternal($type->getName(), $alreadyResolvedIds);
         }
 
-       return $this->createInstance($reflection, $dependencies);
+        return $this->newInstance($reflection, $dependencies);
     }
 
-    private function createInstance(ReflectionClass $reflection, ?array $dependencies = null)
+    private function newInstance(ReflectionClass $reflection, ?array $dependencies = null)
     {
         $instance = null;
         if (isset($dependencies))
         {
             $instance = $reflection->newInstanceArgs($dependencies);
         }
-        $instance = $reflection->newInstance();
-        $name = $reflection->getName();
-        if (in_array($name, $this->singletonIds))
+        else
         {
-            $this->instances[$reflection->getName()] = $instance;   
+            $instance = $reflection->newInstance();
+        }
+        if ($this->isSingleton($reflection->getName()))
+        {
+            $this->instances[$reflection->getName()] = $instance;
         }
         return $instance;
     }
 
-    private function hasBinding(string $abstractId) : bool {
+    private function isSingleton(string $class) : bool {
+        return in_array($class, $this->singletonIds);
+    }
+
+    private function isAbstract(string $abstractId) : bool {
         return isset($this->bindings[$abstractId]);
     }
 
-    private function getBinding(string $abstractId) : string {
+    private function getConcrete(string $abstractId) : string {
         return $this->bindings[$abstractId];
     }
 }
