@@ -6,11 +6,30 @@ use MiniLaravel\Di\Container;
 use ReflectionClass;
 
 use PDO;
+use RuntimeException;
 
 class Model{
     private static Database $database;
     private $fields = [];
-    
+    protected $fillable;
+
+    public function __construct(?array $data = null)
+    {
+        if (!isset($this->fillable)) {
+            $this->fields = $data;
+            return;
+        }
+        
+        foreach ($data as $key => $value) {
+            if(!in_array($key, $this->fillable))
+            {
+                throw new RuntimeException("$key is not allow to a mass assignment");
+            }
+        }
+
+        $this->fields = $data;
+    }
+
     public static function setDatabase(Database $database)
     {
         self::$database = $database;
@@ -67,7 +86,28 @@ class Model{
         $this->fields = $data;
     }
 
-    public function insert() : void {
+    public function delete() : void {
+        $tablename = static::getTableName();
+
+        $sql = "DELETE FROM $tablename WHERE id=:id";
+
+        $statement = self::$database
+            ->getPdo()
+            ->prepare($sql);
+
+        $statement->execute([":id" => $this->fields["id"]]);
+    }
+
+    public function save() : void {
+        if (isset($this->fields["id"]))
+        {
+            $this->update();
+            return;
+        }
+        $this->insert();
+    }
+    
+    private function insert() : void {
         $tablename = static::getTableName();
         
         $columns = array_keys($this->fields);
@@ -90,6 +130,26 @@ class Model{
         $this->fields['id'] = self::$database->getPdo()->lastInsertId();
     }
 
-    //insert into Users (id, name, age) values (:id, :name, :age);
-    //[:id => 1, :name => bob, :age => age]
+    private function update() : void {
+        $tablename = static::getTableName();
+        
+        $valuesData = [];
+        foreach ($this->fields as $key => $value) {
+            $valuesData[":".$key] = $value;
+        }
+
+        $id = $this->fields["id"];
+        unset($this->fields["id"]);
+
+        $valuesTemplate = implode(", ", array_map(fn($key) => "$key=:$key", array_keys($this->fields)));
+
+        $sql = "UPDATE $tablename SET $valuesTemplate WHERE id=:id";
+
+        $statement = self::$database
+            ->getPdo()
+            ->prepare($sql);
+
+        $statement->execute($valuesData);
+        $this->fields['id'] = $id;
+    }
 }
