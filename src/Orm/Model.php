@@ -20,6 +20,10 @@ class Model{
             return;
         }
         
+        if (!isset($data)) {
+            return;
+        }
+
         foreach ($data as $key => $value) {
             if(!in_array($key, $this->fillable))
             {
@@ -65,6 +69,10 @@ class Model{
         $object->fill($data);
 
         return $object;
+    }
+
+    public static function query() : QueryBuilder {
+        return new QueryBuilder(static::class, self::$database, self::getTableName());
     }
 
     public function __get(string $name) : mixed
